@@ -62,7 +62,20 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
 /* бюджет */
 .month-nav a { font-size: 24px; text-decoration: none; padding: 4px 12px; }
 .center-text { text-align: center; text-transform: capitalize; }
-.big { font-size: 32px; font-weight: 600; margin: 4px 0; }
+.big { font-size: 40px; font-weight: 600; margin: 0; line-height: 1.1; }
+.small { font-size: 13px; }
+.today-card { text-align: center; padding: 20px 16px; }
+.today-card > p { margin: 4px 0; }
+.today-card .entry, .today-card .entry-form { text-align: left; }
+.today-card .entry:first-of-type { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.today-card .entry-form { margin-top: 12px; }
+details.panel { padding: 0 16px; }
+details.panel > summary { display: flex; gap: 8px; align-items: center; padding: 14px 0; cursor: pointer; list-style: none; font-weight: 600; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after { content: '›'; color: var(--muted); transition: transform 0.15s; }
+details.panel[open] > summary::after { transform: rotate(90deg); }
+details.panel > summary .muted { font-weight: 400; font-size: 14px; }
+details.panel[open] { padding-bottom: 12px; }
 .actions { margin-top: 8px; }
 .list li.day { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
 .list li.day.today { background: color-mix(in srgb, var(--accent) 8%, transparent); }

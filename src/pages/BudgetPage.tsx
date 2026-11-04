@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { api, type Budget, type BudgetEntry } from '../lib/api'
@@ -23,7 +23,7 @@ export function BudgetPage() {
   const [budget, setBudget] = useState<Budget | null | undefined>(undefined)
   const [entries, setEntries] = useState<BudgetEntry[]>([])
   const [editingBudget, setEditingBudget] = useState(false)
-  const [openDay, setOpenDay] = useState<string | null>(today)
+  const [openDay, setOpenDay] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const reload = useCallback(async () => {
@@ -43,7 +43,7 @@ export function BudgetPage() {
     void reload()
   }, [reload])
 
-  const rows = useMemo(() => (budget ? budgetDays(budget.amount_cents, month, entries) : []), [budget, month, entries])
+  const rows = budget ? budgetDays(budget.amount_cents, month, entries) : []
 
   if (!me) return null
   const money = (c: number) => formatMoney(c, budget?.currency)
@@ -88,6 +88,11 @@ export function BudgetPage() {
 
   const stats = monthStats(budget.amount_cents, rows, today)
   const todayRow = rows.find((r) => r.date === today)
+  const onAdd = (date: string, cents: number, description: string | null) =>
+    run(() => api.addBudgetEntry(budget.id, { spent_on: date, amount_cents: cents, description }))
+  const onUpdate = (id: number, cents: number, description: string | null) =>
+    run(() => api.updateBudgetEntry(id, { amount_cents: cents, description }))
+  const onDelete = (id: number) => confirm('Удалить трату?') && run(() => api.deleteBudgetEntry(id))
 
   return (
     <>
@@ -95,22 +100,33 @@ export function BudgetPage() {
       {error && <p className="error">{error}</p>}
 
       {todayRow && (
-        <section className="card">
-          <h3>Сегодня</h3>
-          <p className={`big ${sign(todayRow.left)}`}>{money(todayRow.left)}</p>
-          <p className="muted">
-            доступно было {money(todayRow.available)} = лимит {money(todayRow.allowance)}{' '}
-            {todayRow.carry >= 0 ? '+ остаток' : '− перерасход'} {money(Math.abs(todayRow.carry))} · потрачено{' '}
-            {money(todayRow.spent)}
+        <section className="card today-card">
+          <p className="muted">{todayRow.left >= 0 ? 'Можно потратить сегодня' : 'Перерасход сегодня'}</p>
+          <p className={`big ${sign(todayRow.left)}`}>{money(Math.abs(todayRow.left))}</p>
+          <p className="muted small">
+            лимит {money(todayRow.allowance)}
+            {todayRow.carry !== 0 &&
+              (todayRow.carry > 0
+                ? ` + ${money(todayRow.carry)} с прошлых дней`
+                : ` − ${money(-todayRow.carry)} перерасход прошлых дней`)}
+            {todayRow.spent > 0 && ` · потрачено ${money(todayRow.spent)}`}
           </p>
+          <DayEntries
+            date={today}
+            entries={entries.filter((e) => e.spent_on === today)}
+            money={money}
+            onAdd={onAdd}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+          />
         </section>
       )}
 
-      <section className="card">
-        <div className="row">
-          <h3 className="grow">Месяц</h3>
-          <button className="link" onClick={() => setEditingBudget(true)}>изменить бюджет</button>
-        </div>
+      <details className="card panel" open={!todayRow}>
+        <summary>
+          <span className="grow">Бюджет на месяц</span>
+          <span className="muted">{money(stats.remaining)} из {money(stats.budget)}</span>
+        </summary>
         <ul className="list">
           <li><span className="grow">Бюджет</span>{money(stats.budget)}</li>
           <li><span className="grow">Лимит в день</span>{money(stats.baseDaily)}</li>
@@ -123,10 +139,13 @@ export function BudgetPage() {
             </li>
           )}
         </ul>
-      </section>
+        <button className="link" onClick={() => setEditingBudget(true)}>Изменить бюджет</button>
+      </details>
 
-      <section className="card">
-        <h3>По дням</h3>
+      <details className="card panel">
+        <summary>
+          <span className="grow">Статистика по дням</span>
+        </summary>
         <ul className="list days">
           {rows.map((r) => (
             <DayItem
@@ -137,15 +156,13 @@ export function BudgetPage() {
               entries={entries.filter((e) => e.spent_on === r.date)}
               money={money}
               onToggle={() => setOpenDay(openDay === r.date ? null : r.date)}
-              onAdd={(cents, description) =>
-                run(() => api.addBudgetEntry(budget.id, { spent_on: r.date, amount_cents: cents, description }))
-              }
-              onUpdate={(id, cents, description) => run(() => api.updateBudgetEntry(id, { amount_cents: cents, description }))}
-              onDelete={(id) => confirm('Удалить трату?') && run(() => api.deleteBudgetEntry(id))}
+              onAdd={onAdd}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
             />
           ))}
         </ul>
-      </section>
+      </details>
     </>
   )
 }
@@ -190,16 +207,18 @@ function BudgetForm({
   )
 }
 
+interface EntryHandlers {
+  onAdd: (date: string, cents: number, description: string | null) => Promise<void>
+  onUpdate: (id: number, cents: number, description: string | null) => Promise<void>
+  onDelete: (id: number) => void
+}
+
 function DayItem({
   row,
   isToday,
   open,
-  entries,
-  money,
   onToggle,
-  onAdd,
-  onUpdate,
-  onDelete,
+  ...rest
 }: {
   row: DayRow
   isToday: boolean
@@ -207,45 +226,58 @@ function DayItem({
   entries: BudgetEntry[]
   money: (c: number) => string
   onToggle: () => void
-  onAdd: (cents: number, description: string | null) => Promise<void>
-  onUpdate: (id: number, cents: number, description: string | null) => Promise<void>
-  onDelete: (id: number) => void
-}) {
-  const [editing, setEditing] = useState<BudgetEntry | null>(null)
+} & EntryHandlers) {
   return (
     <li className={`day${isToday ? ' today' : ''}`}>
       <button className="day-head" onClick={onToggle}>
         <span className="grow">{dayTitle(row.date)}{isToday && ' · сегодня'}</span>
-        <span className="muted">{money(row.spent)} / {money(row.available)}</span>
-        <span className={`day-left ${sign(row.left)}`}>{money(row.left)}</span>
+        <span className="muted">{rest.money(row.spent)} / {rest.money(row.available)}</span>
+        <span className={`day-left ${sign(row.left)}`}>{rest.money(row.left)}</span>
       </button>
       {open && (
         <div className="day-body">
-          {entries.length === 0 && <p className="muted">Трат нет</p>}
-          {entries.map((e) =>
-            editing?.id === e.id ? (
-              <EntryForm
-                key={e.id}
-                initial={e}
-                onCancel={() => setEditing(null)}
-                onSave={async (c, d) => {
-                  await onUpdate(e.id, c, d)
-                  setEditing(null)
-                }}
-              />
-            ) : (
-              <div key={e.id} className="row entry">
-                <span className="grow">{e.description || <span className="muted">без описания</span>}</span>
-                <span>{money(e.amount_cents)}</span>
-                <button className="link" onClick={() => setEditing(e)}>изм.</button>
-                <button className="link danger" onClick={() => onDelete(e.id)}>удал.</button>
-              </div>
-            ),
-          )}
-          {!editing && <EntryForm onSave={onAdd} />}
+          {rest.entries.length === 0 && <p className="muted">Трат нет</p>}
+          <DayEntries date={row.date} {...rest} />
         </div>
       )}
     </li>
+  )
+}
+
+/** Траты одного дня с правкой/удалением и форма добавления. */
+function DayEntries({
+  date,
+  entries,
+  money,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: { date: string; entries: BudgetEntry[]; money: (c: number) => string } & EntryHandlers) {
+  const [editing, setEditing] = useState<BudgetEntry | null>(null)
+  return (
+    <>
+      {entries.map((e) =>
+        editing?.id === e.id ? (
+          <EntryForm
+            key={e.id}
+            initial={e}
+            onCancel={() => setEditing(null)}
+            onSave={async (c, d) => {
+              await onUpdate(e.id, c, d)
+              setEditing(null)
+            }}
+          />
+        ) : (
+          <div key={e.id} className="row entry">
+            <span className="grow">{e.description || <span className="muted">без описания</span>}</span>
+            <span>{money(e.amount_cents)}</span>
+            <button className="link" onClick={() => setEditing(e)}>изм.</button>
+            <button className="link danger" onClick={() => onDelete(e.id)}>удал.</button>
+          </div>
+        ),
+      )}
+      {!editing && <EntryForm onSave={(c, d) => onAdd(date, c, d)} />}
+    </>
   )
 }
 
@@ -276,7 +308,7 @@ function EntryForm({
     <form className="row entry-form" onSubmit={submit}>
       <input placeholder="На что" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} />
       <input className="amount" placeholder="Сумма" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-      <button>{initial ? 'OK' : '+'}</button>
+      <button>{initial ? 'OK' : 'Добавить'}</button>
       {onCancel && <button type="button" className="secondary" onClick={onCancel}>×</button>}
       {error && <span className="error">{error}</span>}
     </form>
