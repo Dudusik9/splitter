@@ -213,6 +213,17 @@ export function GroupPage() {
           >
             Покинуть группу
           </button>
+          {group.created_by === me.id && (
+            <button
+              className="danger"
+              onClick={() =>
+                confirm(`Удалить группу «${group.name}» со всеми тратами и расчётами? Это нельзя отменить.`) &&
+                api.deleteGroup(groupId).then(() => nav('/')).catch((e) => setError(e.message))
+              }
+            >
+              Удалить группу
+            </button>
+          )}
         </>
       )}
     </>

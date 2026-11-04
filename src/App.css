@@ -34,6 +34,7 @@ input[type=checkbox] { width: auto; }
 button { padding: 10px 14px; font: inherit; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
 button:disabled { opacity: 0.6; }
 button.secondary { background: var(--line); color: var(--text); }
+button.danger { background: var(--danger); margin-left: 8px; }
 button.link { background: none; color: var(--accent); padding: 4px 6px; }
 button.link.danger { color: var(--danger); }
 .row { display: flex; gap: 8px; align-items: center; }

@@ -10,6 +10,7 @@ export interface Group {
   id: number
   name: string
   currency: string
+  created_by: number
 }
 export interface Expense {
   id: number
@@ -57,8 +58,8 @@ export const api = {
   myProfile: (authId: string) =>
     ok(supabase.from('profiles').select('id, username, display_name').eq('auth_id', authId).single()),
 
-  groups: () => ok(supabase.from('groups').select('id, name, currency').order('id', { ascending: false })),
-  group: (id: number) => ok(supabase.from('groups').select('id, name, currency').eq('id', id).single()),
+  groups: () => ok(supabase.from('groups').select('id, name, currency, created_by').order('id', { ascending: false })),
+  group: (id: number) => ok(supabase.from('groups').select('id, name, currency, created_by').eq('id', id).single()),
   createGroup: (name: string, currency: string) =>
     ok(supabase.rpc('create_group', { p_name: name, p_currency: currency })) as Promise<number>,
 
@@ -74,6 +75,7 @@ export const api = {
   addMember: (groupId: number, identifier: string) =>
     ok(supabase.rpc('add_group_member', { p_group_id: groupId, p_identifier: identifier })),
   leaveGroup: (groupId: number) => ok(supabase.rpc('leave_group', { p_group_id: groupId })),
+  deleteGroup: (groupId: number) => ok(supabase.rpc('delete_group', { p_group_id: groupId })),
 
   expenses: async (groupId: number): Promise<Expense[]> =>
     (await ok(
