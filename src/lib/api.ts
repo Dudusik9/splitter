@@ -30,7 +30,20 @@ export interface Settlement {
   created_at: string
 }
 
-const toRows = (parts: Part[]) => parts.map((p) => ({ user_id: p.userId, cents: p.cents }))
+export interface Budget {
+  id: number
+  month: string // первое число месяца, "YYYY-MM-01"
+  amount_cents: number
+  currency: string
+}
+export interface BudgetEntry {
+  id: number
+  spent_on: string
+  amount_cents: number
+  description: string | null
+}
+
+const toRows =(parts: Part[]) => parts.map((p) => ({ user_id: p.userId, cents: p.cents }))
 
 async function ok<T>(p: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await p
@@ -120,4 +133,35 @@ export const api = {
     }[]
     return new Map(rows.map((r) => [r.user_id, Number(r.net_cents)]))
   },
+
+  // month: "YYYY-MM"; RLS отдаёт только бюджеты текущего пользователя
+  budget: (month: string) =>
+    ok(
+      supabase.from('budgets').select('id, month, amount_cents, currency').eq('month', `${month}-01`).maybeSingle(),
+    ) as Promise<Budget | null>,
+  saveBudget: (ownerId: number, month: string, cents: number, currency: string) =>
+    ok(
+      supabase
+        .from('budgets')
+        .upsert(
+          { owner: ownerId, month: `${month}-01`, amount_cents: cents, currency },
+          { onConflict: 'owner,month' },
+        )
+        .select('id, month, amount_cents, currency')
+        .single(),
+    ) as Promise<Budget>,
+  budgetEntries: (budgetId: number) =>
+    ok(
+      supabase
+        .from('budget_entries')
+        .select('id, spent_on, amount_cents, description')
+        .eq('budget_id', budgetId)
+        .order('spent_on')
+        .order('id'),
+    ) as Promise<BudgetEntry[]>,
+  addBudgetEntry: (budgetId: number, e: Omit<BudgetEntry, 'id'>) =>
+    ok(supabase.from('budget_entries').insert({ budget_id: budgetId, ...e })),
+  updateBudgetEntry: (id: number, e: Pick<BudgetEntry, 'amount_cents' | 'description'>) =>
+    ok(supabase.from('budget_entries').update(e).eq('id', id)),
+  deleteBudgetEntry: (id: number) => ok(supabase.from('budget_entries').delete().eq('id', id)),
 }

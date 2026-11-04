@@ -54,3 +54,24 @@ fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; }
 .pos { color: var(--accent); }
 .neg { color: var(--danger); }
 .center { text-align: center; margin-top: 48px; }
+
+.shell > header nav a { text-decoration: none; padding: 4px 6px; border-radius: 6px; }
+.shell > header nav a.active { background: var(--line); color: var(--text); }
+
+/* бюджет */
+.month-nav a { font-size: 24px; text-decoration: none; padding: 4px 12px; }
+.center-text { text-align: center; text-transform: capitalize; }
+.big { font-size: 32px; font-weight: 600; margin: 4px 0; }
+.actions { margin-top: 8px; }
+.list li.day { flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
+.list li.day.today { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.day-head { display: flex; gap: 8px; align-items: center; width: 100%; padding: 10px 4px; background: none; color: var(--text); border-radius: 0; text-align: left; }
+.day-head .muted { font-size: 13px; }
+.day-left { min-width: 90px; text-align: right; white-space: nowrap; }
+.day-body { padding: 4px 4px 12px; }
+.entry { padding: 4px 0; }
+.entry-form { margin-top: 6px; flex-wrap: wrap; }
+.entry-form input:first-child { flex: 1; min-width: 120px; }
+@media (max-width: 420px) {
+  .day-head .muted { display: none; }
+}

@@ -1,7 +1,8 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { isConfigured } from './lib/supabase'
 import { AuthPage } from './pages/AuthPage'
+import { BudgetPage } from './pages/BudgetPage'
 import { GroupPage } from './pages/GroupPage'
 import { GroupsPage } from './pages/GroupsPage'
 import './App.css'
@@ -14,6 +15,10 @@ function Shell() {
     <div className="shell">
       <header>
         <strong>Splitter</strong>
+        <nav className="row">
+          <NavLink to="/" end>Группы</NavLink>
+          <NavLink to="/budget">Бюджет</NavLink>
+        </nav>
         <span className="muted">
           @{me.username} · мой ID: <b>{me.id}</b>
         </span>
@@ -22,6 +27,8 @@ function Shell() {
       <Routes>
         <Route path="/" element={<GroupsPage />} />
         <Route path="/group/:id" element={<GroupPage />} />
+        <Route path="/budget" element={<BudgetPage />} />
+        <Route path="/budget/:month" element={<BudgetPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
