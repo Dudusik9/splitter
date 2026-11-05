@@ -83,6 +83,7 @@ details.panel[open] { padding-bottom: 12px; }
 .day-head .muted { font-size: 13px; }
 .day-left { min-width: 90px; text-align: right; white-space: nowrap; }
 .day-body { padding: 4px 4px 12px; }
+.list li.half-sep { padding: 12px 4px 4px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
 .entry { padding: 4px 0; }
 .entry-form { margin-top: 6px; flex-wrap: wrap; }
 .entry-form input:first-child { flex: 1; min-width: 120px; }

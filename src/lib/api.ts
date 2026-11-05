@@ -1,3 +1,4 @@
+import { allocationTotal, type Allocation } from './budget'
 import { supabase } from './supabase'
 import type { Part } from './split'
 
@@ -34,9 +35,19 @@ export interface Settlement {
 export interface Budget {
   id: number
   month: string // первое число месяца, "YYYY-MM-01"
-  amount_cents: number
+  amount_cents: number // сумма за месяц в обоих режимах
   currency: string
+  mode: 'month' | 'halves'
+  first_half_cents: number | null // 1–15, только в режиме halves
+  second_half_cents: number | null // 16–конец
 }
+
+const BUDGET_COLUMNS = 'id, month, amount_cents, currency, mode, first_half_cents, second_half_cents'
+
+export const budgetAllocation = (b: Budget): Allocation =>
+  b.mode === 'halves' && b.first_half_cents !== null && b.second_half_cents !== null
+    ? { first: b.first_half_cents, second: b.second_half_cents }
+    : b.amount_cents
 export interface BudgetEntry {
   id: number
   spent_on: string
@@ -139,17 +150,25 @@ export const api = {
   // month: "YYYY-MM"; RLS отдаёт только бюджеты текущего пользователя
   budget: (month: string) =>
     ok(
-      supabase.from('budgets').select('id, month, amount_cents, currency').eq('month', `${month}-01`).maybeSingle(),
+      supabase.from('budgets').select(BUDGET_COLUMNS).eq('month', `${month}-01`).maybeSingle(),
     ) as Promise<Budget | null>,
-  saveBudget: (ownerId: number, month: string, cents: number, currency: string) =>
+  saveBudget: (ownerId: number, month: string, allocation: Allocation, currency: string) =>
     ok(
       supabase
         .from('budgets')
         .upsert(
-          { owner: ownerId, month: `${month}-01`, amount_cents: cents, currency },
+          {
+            owner: ownerId,
+            month: `${month}-01`,
+            amount_cents: allocationTotal(allocation),
+            currency,
+            mode: typeof allocation === 'number' ? 'month' : 'halves',
+            first_half_cents: typeof allocation === 'number' ? null : allocation.first,
+            second_half_cents: typeof allocation === 'number' ? null : allocation.second,
+          },
           { onConflict: 'owner,month' },
         )
-        .select('id, month, amount_cents, currency')
+        .select(BUDGET_COLUMNS)
         .single(),
     ) as Promise<Budget>,
   budgetEntries: (budgetId: number) =>

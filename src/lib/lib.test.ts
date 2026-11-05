@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeNets, simplifyDebts } from './balances'
-import { budgetDays, localISODate, monthStats, shiftMonth } from './budget'
+import { budgetDays, halfOf, localISODate, monthStats, periodStats, shiftMonth, splitHalves } from './budget'
 import { formatMoney, parseMoney } from './money'
 import { isValidSplit, remainder, splitEqual, sumParts } from './split'
 
@@ -85,8 +85,40 @@ describe('budget', () => {
   it('month stats and per-day allowance for remaining days', () => {
     const rows = budgetDays(3_000_000, '2026-11', [entry('2026-11-01', 500_000)])
     const s = monthStats(3_000_000, rows, '2026-11-21')
-    expect(s).toEqual({ budget: 3_000_000, spent: 500_000, remaining: 2_500_000, baseDaily: 100_000, daysLeft: 10, perDayLeft: 250_000 })
+    expect(s).toEqual({ budget: 3_000_000, carryIn: 0, spent: 500_000, remaining: 2_500_000, baseDaily: 100_000, daysLeft: 10, perDayLeft: 250_000 })
     expect(monthStats(3_000_000, rows, '2026-12-01').perDayLeft).toBeNull()
+  })
+  it('half allowances sum to each half budget', () => {
+    for (const [month, n] of [['2026-02', 28], ['2026-11', 30], ['2026-12', 31]] as const) {
+      const rows = budgetDays({ first: 1_500_001, second: 2_000_003 }, month, [])
+      expect(rows).toHaveLength(n)
+      expect(rows.slice(0, 15).reduce((s, r) => s + r.allowance, 0)).toBe(1_500_001)
+      expect(rows.slice(15).reduce((s, r) => s + r.allowance, 0)).toBe(2_000_003)
+    }
+  })
+  it('carries first-half leftover and overspend into the second half', () => {
+    const halves = { first: 1_500_000, second: 1_500_000 } // ноябрь: 1000 ₽/день в обеих половинах
+    const saved = budgetDays(halves, '2026-11', [entry('2026-11-01', 50_000)])
+    expect(saved[15].date).toBe('2026-11-16')
+    expect(saved[15].carry).toBe(1_450_000) // 15 000 − 500 неистраченного
+    expect(saved[15].available).toBe(1_550_000)
+    const over = budgetDays(halves, '2026-11', [entry('2026-11-10', 1_700_000)])
+    expect(over[15].carry).toBe(-200_000)
+  })
+  it('half stats include carry-in', () => {
+    const rows = budgetDays({ first: 1_500_000, second: 2_000_000 }, '2026-11', [entry('2026-11-20', 100_000)])
+    const second = rows.slice(15)
+    expect(periodStats(2_000_000, 300_000, second, '2026-11-21')).toEqual({
+      budget: 2_000_000, carryIn: 300_000, spent: 100_000, remaining: 2_200_000, baseDaily: 133_333, daysLeft: 10, perDayLeft: 220_000,
+    })
+    expect(periodStats(2_000_000, -500_000, second, '2026-11-21').remaining).toBe(1_400_000)
+  })
+  it('half boundary and proportional split', () => {
+    expect(halfOf('2026-11-15')).toBe(1)
+    expect(halfOf('2026-11-16')).toBe(2)
+    expect(splitHalves(3_000_000, '2026-11')).toEqual({ first: 1_500_000, second: 1_500_000 })
+    const feb = splitHalves(100_001, '2026-02')
+    expect(feb.first + feb.second).toBe(100_001)
   })
   it('local dates and month shifting', () => {
     expect(localISODate(new Date(2026, 10, 4, 23, 59))).toBe('2026-11-04')
